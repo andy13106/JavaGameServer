@@ -24,6 +24,7 @@ docker compose -f deploy/compose.yaml down -v
 仓库根目录执行：
 
 ```powershell
+mvn -B -ntp -DskipTests package
 docker build -f deploy/Dockerfile -t gameframe:dev .
 docker run --rm --network host `
   -e GAME_MONGO_URI=mongodb://127.0.0.1:37017/gameframe `
@@ -32,7 +33,7 @@ docker run --rm --network host `
   gameframe:dev
 ```
 
-镜像固定使用 JDK 25 构建和 JRE 25 运行，最终进程以非 root 用户 `gameframe` 启动。生产环境应把数据库 URI、账号密钥等通过 Secret 或环境变量注入，并按实际网络拓扑替换示例中的 `--network host`。
+`deploy/Dockerfile` 使用已由 JDK 25 Maven 构建的 shaded JAR，再用 JRE 25 构建运行镜像；CI 环境可使用 `deploy/Dockerfile.build` 执行容器内多阶段构建。最终进程以非 root 用户 `gameframe` 启动。容器默认设置 `GAME_BIND_HOST=0.0.0.0`；本机直接运行时默认仍为 `127.0.0.1`。生产环境应把数据库 URI、账号密钥等通过 Secret 或环境变量注入，并按实际网络拓扑替换示例中的 `--network host`。
 ## 跨容器迁移演练
 
 `MigrationNodeMain` 支持 `--host`、`--name` 和 `--port` 参数。跨容器场景要监听 `0.0.0.0`：
@@ -50,3 +51,12 @@ docker network rm gameframe-migration-it
 ```
 
 该演练已验证两个独立容器之间的 zfoo 迁移 RPC、阶段幂等和目标提交后的路由发布。
+## 性能基线
+
+构建 shaded JAR 后可运行本地基线：
+
+```powershell
+java -XX:+UseZGC -jar game-demo/target/game-demo-0.1.0-SNAPSHOT.jar --benchmark --actor-ops=200000 --storage-ops=20000
+```
+
+输出 JSON 包含 JDK、操作系统、Actor 邮箱吞吐和内存局部更新吞吐。该入口用于比较同一机器上不同提交的趋势，不能替代生产压测。

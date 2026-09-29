@@ -1,9 +1,15 @@
+## 2026-09-29：JDK 25 发布镜像实测
+
+本机先执行 Maven JDK 25 打包，再使用 `deploy/Dockerfile` 构建 `gameframe:release` 成功；容器内执行 `--benchmark` 正常输出 JSON，验证 JRE 25 运行时和非 root 镜像入口可用。由于 Docker Hub Maven 基础镜像认证不稳定，CI 多阶段模板单独保留为 `deploy/Dockerfile.build`。
+## 2026-09-29：性能基线入口
+
+新增 `BenchmarkMain` 和 `DemoMain --benchmark`。默认测量 Actor 邮箱和 `MemoryDocumentStore` 局部增量更新，结果以 JSON 输出。本机 JDK 25.0.2、8 逻辑处理器实测：Actor 200,000 次约 1,926,348 ops/s；局部更新 20,000 次约 19,322 ops/s。该结果用于回归趋势，不代表生产压测上限。
 ## 2026-09-29：跨容器玩家迁移演练
 
 新增 `PlayerMigrationContainerExerciseIT` 和 `deploy/Dockerfile.runtime`。使用 JDK 25 runtime 镜像启动两个独立 GameFrame 容器，节点监听 `0.0.0.0:9001` 并映射到宿主机 39101/39102；测试通过真实 TCP 完成 freeze、prepare、release、commit，容器日志确认四个阶段均执行，目标提交后发布路由。跨容器测试 1 项通过。
 ## 2026-09-29：跨 JVM 玩家迁移演练
 
-新增 `MigrationNodeMain` 独立 Game 节点入口和 `PlayerMigrationCrossJvmExerciseTest`。测试进程启动两个独立 JDK 25 子 JVM，分别监听随机 TCP 端口；父进程通过真实 socket 和 zfoo RPC 执行冻结、准备、释放、提交，确认目标提交完成后才发布 `game-b` 路由。跨 JVM 测试 1 项通过，子节点正常退出；跨容器部署演练仍待完成。
+新增 `MigrationNodeMain` 独立 Game 节点入口和 `PlayerMigrationCrossJvmExerciseTest`。测试进程启动两个独立 JDK 25 子 JVM，分别监听随机 TCP 端口；父进程通过真实 socket 和 zfoo RPC 执行冻结、准备、释放、提交，确认目标提交完成后才发布 `game-b` 路由。跨 JVM 测试 1 项通过，子节点正常退出；跨容器部署演练已在后续条目中通过。
 ## 2026-09-29：迁移 RPC 服务端幂等合并
 
 `ZfooPlayerMigrationHandler` 接入 `RpcIdempotencyRegistry`，相同 commandId 的重试会共享原始操作结果，冻结、提交等迁移阶段不会因网络重试重复执行。新增重复命令测试，transport-zfoo 全模块 73 项通过。
@@ -14,11 +20,11 @@
 
 ## 2026-09-29：双节点 TCP 玩家迁移演练
 
-新增 `PlayerMigrationTcpExerciseTest`：启动两个独立监听的 zfoo TCP Game 节点，客户端通过真实 socket 发送 RPC envelope，服务端解码迁移命令并回包，协调器完成冻结、准备、释放、提交，最后才发布新路由。1 项端到端测试通过；跨 JVM 本机演练已在后续测试中通过，跨容器部署演练仍待执行。
+新增 `PlayerMigrationTcpExerciseTest`：启动两个独立监听的 zfoo TCP Game 节点，客户端通过真实 socket 发送 RPC envelope，服务端解码迁移命令并回包，协调器完成冻结、准备、释放、提交，最后才发布新路由。1 项端到端测试通过；跨 JVM 本机演练已在后续测试中通过，跨容器部署演练已在后续条目中通过。
 
 ## 2026-09-28：JDK 25 发布镜像模板
 
-新增 `deploy/Dockerfile` 多阶段构建：使用 Maven/JDK 25 编译、JRE 25 运行，最终以非 root 用户启动 `game-demo --serve`；`deploy/README.md` 补充镜像构建、端口和 Secret 注入说明。
+新增 `deploy/Dockerfile` JRE 25 发布镜像和 `deploy/Dockerfile.build` CI 多阶段构建模板；发布镜像以非 root 用户启动 `game-demo --serve`，并通过 `GAME_BIND_HOST=0.0.0.0` 支持容器端口映射。`deploy/README.md` 补充镜像构建、端口和 Secret 注入说明。
 
 ## 2026-09-28：统一运行时运维快照
 

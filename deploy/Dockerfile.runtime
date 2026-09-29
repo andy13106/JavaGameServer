@@ -3,4 +3,7 @@ WORKDIR /app
 RUN useradd --system --uid 10001 --create-home gameframe
 COPY game-demo/target/game-demo-0.1.0-SNAPSHOT.jar /app/gameframe.jar
 USER 10001
+ENV GAME_PORT=9000
+ENV GAME_BIND_HOST=0.0.0.0
+EXPOSE 9000
 ENTRYPOINT ["java", "-XX:+UseZGC", "-jar", "/app/gameframe.jar"]

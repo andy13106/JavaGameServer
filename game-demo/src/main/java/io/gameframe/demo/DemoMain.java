@@ -10,6 +10,10 @@ import java.util.concurrent.*;
 
 public final class DemoMain {
     public static void main(String[] args) throws Exception {
+        if (Arrays.asList(args).contains("--benchmark")) {
+            BenchmarkMain.runFromArgs(args);
+            return;
+        }
         if (Arrays.asList(args).contains("--migration-node")) {
             MigrationNodeMain.run(args);
             return;
@@ -41,8 +45,9 @@ public final class DemoMain {
                     context.registerBean(DemoReceiver.class, () -> new DemoReceiver(player));
                     context.load("game-net.xml"); context.refresh();
                     int port = Integer.parseInt(System.getenv().getOrDefault("GAME_PORT", "9000"));
-                    new TcpServer(HostAndPort.valueOf("127.0.0.1:" + port)).start();
-                    System.out.println("Development TCP endpoint: 127.0.0.1:" + port + "; press Enter to stop.");
+                    String host = System.getenv().getOrDefault("GAME_BIND_HOST", "127.0.0.1");
+                    new TcpServer(HostAndPort.valueOf(host + ":" + port)).start();
+                    System.out.println("Development TCP endpoint: " + host + ":" + port + "; press Enter to stop.");
                     System.in.read();
                 }
             } else {
