@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocols>
+<module id="1" name="native"><protocol location="com.zfoo.net.router.attachment"/></module>
+<module id="2" name="game"><protocol location="io.gameframe.demo.protocol.PlayerRequest" enhance="false"/><protocol location="io.gameframe.demo.protocol.PlayerResponse" enhance="false"/><protocol location="io.gameframe.demo.protocol.TransportContractRequest" enhance="false"/><protocol location="io.gameframe.demo.protocol.TransportContractResponse" enhance="false"/><protocol location="io.gameframe.demo.protocol.AuthenticationRequest" enhance="false"/><protocol location="io.gameframe.demo.protocol.AuthenticationResponse" enhance="false"/><protocol location="io.gameframe.transport.RpcRequestEnvelope" enhance="false"/><protocol location="io.gameframe.transport.RpcResponseEnvelope" enhance="false"/><protocol location="io.gameframe.transport.PlayerMigrationCommand" enhance="false"/><protocol location="io.gameframe.transport.PlayerMigrationReply" enhance="false"/></module>
+</protocols>

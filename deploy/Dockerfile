@@ -1,0 +1,13 @@
+FROM maven:3.9.9-eclipse-temurin-25 AS build
+WORKDIR /workspace
+COPY . .
+RUN mvn -B -ntp -DskipTests package
+
+FROM eclipse-temurin:25-jre
+WORKDIR /app
+RUN useradd --system --uid 10001 --create-home gameframe
+COPY --from=build /workspace/game-demo/target/game-demo-0.1.0-SNAPSHOT.jar /app/gameframe.jar
+USER 10001
+ENV GAME_PORT=9000
+EXPOSE 9000
+ENTRYPOINT ["java", "-XX:+UseZGC", "-jar", "/app/gameframe.jar", "--serve"]

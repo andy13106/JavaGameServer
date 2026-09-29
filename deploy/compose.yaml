@@ -1,0 +1,40 @@
+services:
+  mongo:
+    image: mongo:8.0
+    ports:
+      - "127.0.0.1:37017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' | grep 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "127.0.0.1:36379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  mysql:
+    image: mysql:8.4
+    ports:
+      - "127.0.0.1:33306:3306"
+    environment:
+      MYSQL_DATABASE: gameframe
+      MYSQL_USER: gameframe
+      MYSQL_PASSWORD: gameframe_dev_only
+      MYSQL_ROOT_PASSWORD: root_dev_only
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot_dev_only --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  mongo-data:
+  mysql-data:

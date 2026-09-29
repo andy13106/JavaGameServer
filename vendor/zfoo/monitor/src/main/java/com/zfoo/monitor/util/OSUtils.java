@@ -1,0 +1,324 @@
+/*
+ * Copyright (C) 2020 The zfoo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and limitations under the License.
+ */
+
+package com.zfoo.monitor.util;
+
+import com.zfoo.monitor.*;
+import com.zfoo.net.util.NetUtils;
+import com.zfoo.protocol.util.FileUtils;
+import com.zfoo.protocol.util.IOUtils;
+import com.zfoo.protocol.util.StringUtils;
+import com.zfoo.protocol.util.ThreadUtils;
+import com.zfoo.scheduler.util.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import oshi.hardware.HWDiskStore;
+import oshi.hardware.HardwareAbstractionLayer;
+import oshi.hardware.NetworkIF;
+import oshi.software.os.OperatingSystem;
+
+import java.io.File;
+import java.io.IOException;
+import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Utility class wrapping the OSHI library for retrieving system and hardware information
+ *
+ * @author godotg
+ */
+public abstract class OSUtils {
+
+    private static final Logger logger = LoggerFactory.getLogger(OSUtils.class);
+
+    /**
+     * CPU count
+     */
+    private static final int processors = Runtime.getRuntime().availableProcessors();
+
+    /**
+     * System info
+     */
+    private static final oshi.SystemInfo systemInfo = new oshi.SystemInfo();
+
+    /**
+     * Hardware info
+     */
+    private static final HardwareAbstractionLayer hardware = systemInfo.getHardware();
+
+    /**
+     * OS info
+     */
+    private static final OperatingSystem os = systemInfo.getOperatingSystem();
+
+    /**
+     * Disk I/O
+     */
+    private static final List<HWDiskStore> hwDiskStores = hardware.getDiskStores();
+
+    /**
+     * Network info
+     */
+    private static final List<NetworkIF> networkIFs = hardware.getNetworkIFs();
+
+    /**
+     * CPU tick counts
+     */
+    private static long[] ticks = hardware.getProcessor().getSystemCpuLoadTicks();
+
+    public static int availableProcessors() {
+        return processors;
+    }
+
+    /**
+     * Convert a value less 1.0 to a percentage string; fractional part is rounded
+     */
+    public static String toPercent(double num) {
+        if (num > 1) {
+            throw new RuntimeException("num must be less than 1 to convert to percentage");
+        }
+        var percentFormat = NumberFormat.getPercentInstance();
+        // Maximum decimal digits
+        percentFormat.setMaximumFractionDigits(2);
+        // Maximum integer digits
+        percentFormat.setMaximumIntegerDigits(3);
+        // Minimum decimal digits
+        percentFormat.setMinimumFractionDigits(2);
+        // Automatically convert to percentage format
+        return percentFormat.format(num);
+    }
+
+    /**
+     * Equivalent to the Linux 'uptime' command; returns -1 by default on Windows as it cannot be measured there
+     */
+    public static Uptime uptime() {
+        var processor = hardware.getProcessor();
+        var loads = processor.getSystemLoadAverage(3);
+        var oneMinute = loads[0];
+        var fiveMinute = loads[1];
+        var fiftyMinute = loads[2];
+
+        var cpuTicks = processor.getSystemCpuLoadTicks();
+        var usage = processor.getSystemCpuLoadBetweenTicks(ticks);
+
+        ticks = cpuTicks;
+        return Uptime.valueOf(oneMinute, fiveMinute, fiftyMinute, usage, TimeUtils.now());
+    }
+
+    /**
+     * Equivalent to the Linux 'df -h' command, compatible with Windows
+     */
+    public static List<DiskFileSystem> df() {
+        var fileSystems = os.getFileSystem().getFileStores();
+
+        var nameDfMap = new HashMap<String, List<DiskFileSystem>>();
+        for (var fs : fileSystems) {
+            var name = fs.getName();
+            var size = fs.getTotalSpace();
+            var available = fs.getFreeSpace();
+            var list = nameDfMap.computeIfAbsent(name, (it) -> new ArrayList<>());
+            list.add(DiskFileSystem.valueOf(name, size, available, TimeUtils.now()));
+        }
+
+        var dfs = new ArrayList<DiskFileSystem>();
+        for (var dfList : nameDfMap.values()) {
+            if (dfList.size() == 1) {
+                dfs.add(dfList.get(0));
+            } else {
+                for (int i = 0; i < dfList.size(); i++) {
+                    var df = dfList.get(i);
+                    var name = df.getName();
+                    var index = i + 1;
+                    df.setName(StringUtils.format("{}-{}", name, index));
+                    dfs.add(df);
+                }
+            }
+        }
+
+        return dfs;
+    }
+
+    /**
+     * Equivalent of Linux 'free' command; compatible with Windows
+     */
+    public static Memory free() {
+        var memory = hardware.getMemory();
+        var total = memory.getTotal();
+        var available = memory.getAvailable();
+        return Memory.valueOf(total, available, TimeUtils.now());
+    }
+
+
+    public static List<DiskStorage> iostat() {
+        var diskStorages = new ArrayList<DiskStorage>();
+
+        for (var ds : hwDiskStores) {
+            var name = ds.getName();
+            var oldTimestamp = ds.getTimeStamp();
+            var oldReads = ds.getReads();
+            var oldReadBytes = ds.getReadBytes();
+            var oldWrites = ds.getWrites();
+            var oldWriteBytes = ds.getWriteBytes();
+
+            if (!ds.updateAttributes()) {
+                throw new RuntimeException(StringUtils.format("iostat update exception [ds:{}]", ds));
+            }
+
+            var timestamp = ds.getTimeStamp();
+            var timeInterval = (timestamp - oldTimestamp) / 1000D;
+
+            var reads = (long) Math.ceil(((ds.getReads() - oldReads) / timeInterval));
+            var readKBs = (long) Math.ceil(((ds.getReadBytes() - oldReadBytes) / timeInterval / IOUtils.BYTES_PER_KB));
+            var writes = (long) Math.ceil(((ds.getWrites() - oldWrites) / timeInterval));
+            var writeKBs = (long) Math.ceil(((ds.getWriteBytes() - oldWriteBytes) / timeInterval / IOUtils.BYTES_PER_KB));
+
+            var diskStorage = DiskStorage.valueOf(name, reads, readKBs, writes, writeKBs);
+            diskStorages.add(diskStorage);
+        }
+
+        return diskStorages;
+    }
+
+    /**
+     * Equivalent of Linux 'sar -n DEV 1' command; compatible with Windows
+     */
+    public static List<Sar> sar() {
+        var nameSarMap = new HashMap<String, List<Sar>>();
+        for (var networkIF : networkIFs) {
+            var name = networkIF.getDisplayName() + StringUtils.SPACE + networkIF.getName();
+            var oldTimestamp = networkIF.getTimeStamp();
+            var oldBytesRecv = networkIF.getBytesRecv();
+            var oldBytesSent = networkIF.getBytesSent();
+            var oldPacketsRecv = networkIF.getPacketsRecv();
+            var oldPacketsSent = networkIF.getPacketsSent();
+            var oldInErrors = networkIF.getInErrors();
+            var oldOutErrors = networkIF.getOutErrors();
+            var oldInDrops = networkIF.getInDrops();
+            var oldCollisions = networkIF.getCollisions();
+
+            if (!networkIF.updateAttributes()) {
+                throw new RuntimeException(StringUtils.format("sar update exception [networkIF:{}]", networkIF));
+            }
+
+            var timestamp = networkIF.getTimeStamp();
+            var timeInterval = (timestamp - oldTimestamp) / 1000D;
+            var rxpck = (long) Math.ceil(((networkIF.getPacketsRecv() - oldPacketsRecv) / timeInterval));
+            var txpck = (long) Math.ceil((networkIF.getPacketsSent() - oldPacketsSent) / timeInterval);
+            var rxBytes = (long) Math.ceil((networkIF.getBytesRecv() - oldBytesRecv) / timeInterval);
+            var txBytes = (long) Math.ceil((networkIF.getBytesSent() - oldBytesSent) / timeInterval);
+            var inErrors = networkIF.getInErrors() - oldInErrors;
+            var outErrors = networkIF.getOutErrors() - oldOutErrors;
+            var inDrops = networkIF.getInDrops() - oldInDrops;
+            var collisions = networkIF.getCollisions() - oldCollisions;
+
+            var list = nameSarMap.computeIfAbsent(name, (it) -> new ArrayList<>());
+            list.add(Sar.valueOf(name, rxpck, txpck, rxBytes, txBytes, inErrors, outErrors, inDrops, collisions, timestamp));
+        }
+
+        var sars = new ArrayList<Sar>();
+        for (var sarList : nameSarMap.values()) {
+            if (sarList.size() == 1) {
+                sars.add(sarList.get(0));
+            } else {
+                for (int i = 0; i < sarList.size(); i++) {
+                    var sar = sarList.get(i);
+                    var name = sar.getName();
+                    var index = i + 1;
+                    sar.setName(StringUtils.format("{}-{}", name, index));
+                    sars.add(sar);
+                }
+            }
+        }
+
+        return sars;
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    public static SystemInfo os() {
+        var processor = hardware.getProcessor();
+        var cpuLogicCore = processor.getLogicalProcessorCount();
+        var cpuName = processor.getProcessorIdentifier().getName();
+        return SystemInfo.valueOf(NetUtils.getLocalhostStr(), os.toString(), os.toString(), cpuLogicCore, cpuName);
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    private static final ExecutorService executors = Executors.newCachedThreadPool(new MonitorThreadFactory());
+
+    public static class MonitorThreadFactory implements ThreadFactory {
+        private final AtomicInteger threadNumber = new AtomicInteger(1);
+
+        @Override
+        public Thread newThread(Runnable runnable) {
+            var threadName = StringUtils.format("monitor-t-{}", threadNumber.getAndIncrement());
+            return new Thread(runnable, threadName);
+        }
+    }
+
+    public static String execCommand(String command) {
+        logger.info("execCommand [{}]", command);
+        try {
+            return doExecCommand(command, null, 5 * TimeUtils.MILLIS_PER_MINUTE);
+        } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String execCommand(String command, String workingDirectory) {
+        return execCommand(command, workingDirectory, 5 * TimeUtils.MILLIS_PER_MINUTE);
+    }
+
+    public static String execCommand(String command, String workingDirectory, long timeoutMillis) {
+        logger.info("execCommand [{}] workingDirectory:[{}]", command, workingDirectory);
+        FileUtils.createDirectory(workingDirectory);
+        var wd = new File(workingDirectory);
+        try {
+            return doExecCommand(command, wd, timeoutMillis);
+        } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static String doExecCommand(String command, File wd, long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+        var commandSplits = command.split(StringUtils.SPACE_REGEX);
+        var process = new ProcessBuilder(commandSplits)
+                .redirectErrorStream(true)
+                .directory(wd)
+                .start();
+
+        // Asynchronously read output to avoid blocking due to buffer overflow
+        var stdoutFuture = executors.submit(ThreadUtils.safeCallable(() -> StringUtils.bytesToString(IOUtils.toByteArray(process.getInputStream()))));
+        var stderrFuture = executors.submit(ThreadUtils.safeCallable(() -> StringUtils.bytesToString(IOUtils.toByteArray(process.getErrorStream()))));
+
+        var finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            logger.error("doExecCommand timeout with process of command:[{}]", command);
+        }
+
+        process.destroy();
+        var stdout = stdoutFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
+        var stderr = stderrFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
+
+        // Get the process exit value; 0 means normal exit, non-zero means abnormal termination
+        int exitValue = process.exitValue();
+        if (exitValue != 0 || !stderr.isEmpty()) {
+            logger.error("doExecCommand error executing command exitValue:[{}] stdout:[{}] stderr:[{}]", exitValue, stdout, stderr);
+        }
+
+        return stdout;
+    }
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:net="http://www.zfoo.com/schema/net"
+xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.zfoo.com/schema/net http://www.zfoo.com/schema/net-1.0.xsd">
+<net:net id="gameframe-demo" protocol-location="game-protocol.xml"/>
+<bean id="gameSchedulerContext" class="com.zfoo.scheduler.SchedulerContext"/>
+<bean id="gameEventContext" class="com.zfoo.event.EventContext"/>
+</beans>

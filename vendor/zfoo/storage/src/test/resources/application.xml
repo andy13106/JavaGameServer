@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    You may have noticed that the XML declaration has no closing tag. This is not an error.
+    The declaration is not part of the XML document itself.
+    It is not an XML element, so it does not need a closing tag.
+-->
+
+<!--
+    Default Namespaces: Defining a default namespace for elements allows us to omit
+    the prefix in all child elements.
+    Syntax: xmlns=".......namespaceURI". The reason is that every XML document has a root element.
+-->
+
+<!--
+   Step 1: Add the xmlns:xsi attribute to introduce the xsi namespace.
+   Step 2: Add namespace declarations; multiple can be added, but only one unprefixed namespace is allowed.
+   Step 3: Use the schemaLocation attribute under the xsi namespace to specify the XSD URI for each namespace,
+           pairing each namespace with its URI, separated by spaces.
+           This XML file uses elements from the namespace represented by xsi:
+           "http://www.w3.org/2001/XMLSchema-instance"
+           For example, noNamespaceSchemaLocation="XXX" is used to import schema files without a namespace,
+           and schemaLocation="XXX" is used for schema files with their own namespace.
+           These elements belong to the xsi namespace, so any XML file referencing them must import this namespace.
+           The prefix "xsi" is not mandatory; it is just a widely-used convention for readability.
+           xsi is an alias for http://www.w3.org/2001/XMLSchema-instance.
+           The first URI is the namespace name; the second URI gives the location of the schema document.
+-->
+
+<!--
+   Once you have the XML Schema instance namespace available: xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   you can use the schemaLocation attribute. This attribute takes two values.
+   The first value is the namespace to be used.
+   The second value is the location of the XML schema for that namespace:
+-->
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+
+       xmlns:storage="http://www.zfoo.com/schema/storage"
+
+       xsi:schemaLocation="
+    http://www.springframework.org/schema/beans
+    http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+    http://www.springframework.org/schema/context
+    http://www.springframework.org/schema/context/spring-context-4.0.xsd
+
+    http://www.zfoo.com/schema/storage
+    http://www.zfoo.com/schema/storage-1.0.xsd">
+
+
+    <context:component-scan base-package="com.zfoo.storage"/>
+
+    <storage:storage id="resourceManager">
+        <!-- Both 'package' and 'location' attributes support multiple paths separated by , ; or space -->
+        <storage:scan package="com.zfoo.**.resource" recycle="false"/>
+        <!-- Use 'classpath:' prefix for classpath resources; use 'file:' prefix for filesystem paths -->
+        <storage:resource location="classpath:/,classpath:/excel"/>
+        <!-- <storage:resource location="file:C:\Users\godotg\Desktop\excel"/>-->
+    </storage:storage>
+
+</beans>

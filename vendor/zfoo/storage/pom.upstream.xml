@@ -1,0 +1,273 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.zfoo</groupId>
+    <artifactId>storage</artifactId>
+    <packaging>jar</packaging>
+    <version>4.1.4</version>
+
+    <properties>
+        <zfoo.version>4.1.4</zfoo.version>
+        <!-- spring and spring boot -->
+        <spring.version>6.2.6</spring.version>
+        <spring.boot.version>3.4.5</spring.boot.version>
+        <junit.version>4.13.2</junit.version>
+        <!-- bytecode enhancement -->
+        <javassist.version>3.31.0-GA</javassist.version>
+        <bytebuddy.version>1.17.6</bytebuddy.version>
+        <!-- network framework -->
+        <netty.version>4.1.122.Final</netty.version>
+        <!-- zookeeper -->
+        <curator.version>5.8.0</curator.version>
+        <!-- hardware detection -->
+        <oshi.version>6.8.2</oshi.version>
+        <!-- Office document parsing -->
+        <poi.version>5.4.1</poi.version>
+        <csv.version>1.14.0</csv.version>
+        <!-- maven core plugin -->
+        <native-maven-plugin.version>0.10.6</native-maven-plugin.version>
+        <maven-clean-plugin.version>3.3.1</maven-clean-plugin.version>
+        <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
+        <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
+        <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
+        <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
+        <maven-install-plugin.version>3.1.4</maven-install-plugin.version>
+        <!-- deploy maven repository -->
+        <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
+        <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
+        <maven-javadoc-plugin.version>3.5.0</maven-javadoc-plugin.version>
+        <maven-gpg-plugin.version>3.1.0</maven-gpg-plugin.version>
+        <central-publishing-maven-plugin.version>0.8.0</central-publishing-maven-plugin.version>
+        <!-- encoding and java version -->
+        <project.build.sourceEncoding>${file.encoding}</project.build.sourceEncoding>
+        <maven.compiler.encoding>${file.encoding}</maven.compiler.encoding>
+        <java.version>17</java.version>
+        <file.encoding>UTF-8</file.encoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.zfoo</groupId>
+            <artifactId>scheduler</artifactId>
+            <version>${zfoo.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>${spring.version}</version>
+        </dependency>
+
+        <!-- excel，world，ppt,xml operation library -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>log4j-api</artifactId>
+                    <groupId>org.apache.logging.log4j</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>${csv.version}</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>commons-codec</artifactId>
+                    <groupId>commons-codec</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>commons-io</artifactId>
+                    <groupId>commons-io</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-logging</artifactId>
+            <version>${spring.boot.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+
+    <build>
+        <sourceDirectory>src/main/java</sourceDirectory>
+        <testSourceDirectory>src/test/java</testSourceDirectory>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>${maven-clean-plugin.version}</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>${file.encoding}</encoding>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>${maven-resources-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>copy-resources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <encoding>${file.encoding}</encoding>
+                            <outputDirectory>${project.build.directory}/resource</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/resources/</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <threadCount>8</threadCount>
+                    <argLine>-Dfile.encoding=${file.encoding}</argLine>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven-jar-plugin.version}</version>
+            </plugin>
+
+            <!-- deploy to maven repository should specify these tags -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>${maven-deploy-plugin.version}</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${maven-source-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>${maven-javadoc-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>${maven-gpg-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>${central-publishing-maven-plugin.version}</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <autoPublish>true</autoPublish>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+
+
+    <!-- deploy to maven repository should specify these tags -->
+    <name>storage</name>
+    <description>zfoo storage is Java pojo and excel/csv/json automatic mapping framework</description>
+    <url>https://github.com/zfoo-project/zfoo</url>
+
+    <developers>
+        <developer>
+            <name>all contributors</name>
+            <email>all@zfoo.com</email>
+            <url>https://github.com/zfoo-project/zfoo</url>
+        </developer>
+    </developers>
+
+    <organization>
+        <name>zfoo</name>
+        <url>https://github.com/zfoo-project/zfoo</url>
+    </organization>
+
+    <licenses>
+        <license>
+            <name>Apache License 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>https://github.com/zfoo-project/zfoo.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com:zfoo-project/zfoo.git</developerConnection>
+        <url>https://github.com/zfoo-project/zfoo</url>
+    </scm>
+</project>

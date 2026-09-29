@@ -1,0 +1,113 @@
+/*
+ * Copyright (C) 2020 The zfoo Authors
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and limitations under the License.
+ */
+
+package com.zfoo.net.session;
+
+import com.zfoo.net.consumer.registry.Register;
+import com.zfoo.protocol.util.StringUtils;
+import io.netty.channel.Channel;
+
+import java.io.Closeable;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * @author godotg
+ */
+public class Session implements Closeable {
+
+    private static final AtomicLong ATOMIC_LONG = new AtomicLong(0);
+
+    /**
+     * The globally unique ID of the session and the negative sid are allowed
+     */
+    private long sid;
+
+    private Channel channel;
+
+    // ------------------------------------------------------------------------------------------------------------
+    // The following are extra parameters; add your own fields here if necessary.
+    /**
+     * The default user ID is greater than 0; it equals 0 when the user is not logged in.
+     * This is a user-level extra parameter.
+     */
+    private long uid = 0;
+
+    /**
+     * Extra attributes attached to the session, representing consumer-side properties.
+     */
+    private Register consumerRegister = null;
+
+    public Session(Channel channel) {
+        if (channel == null) {
+            throw new IllegalArgumentException("channel cannot be empty");
+        }
+        this.channel = channel;
+        this.sid = ATOMIC_LONG.incrementAndGet();
+    }
+
+    public Session(long sid, long uid, Channel channel) {
+        this.sid = sid;
+        this.uid = uid;
+        this.channel = channel;
+    }
+
+    @Override
+    public String toString() {
+        return StringUtils.format("[sid:{}] [uid:{}] [channel:{}]", sid, uid, channel);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        Session session = (Session) o;
+        return sid == session.sid;
+    }
+
+    @Override
+    public int hashCode() {
+        return (int) sid;
+    }
+
+    @Override
+    public void close() {
+        channel.close();
+    }
+
+    public long getSid() {
+        return sid;
+    }
+
+    public Channel getChannel() {
+        return channel;
+    }
+
+    public long getUid() {
+        return uid;
+    }
+
+    public void setUid(long uid) {
+        this.uid = uid;
+    }
+
+    public Register getConsumerRegister() {
+        return consumerRegister;
+    }
+
+    public void setConsumerRegister(Register consumerRegister) {
+        this.consumerRegister = consumerRegister;
+    }
+}

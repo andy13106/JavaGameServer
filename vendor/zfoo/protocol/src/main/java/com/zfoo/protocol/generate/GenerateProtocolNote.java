@@ -1,0 +1,141 @@
+/*
+ * Copyright (C) 2020 The zfoo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and limitations under the License.
+ */
+
+package com.zfoo.protocol.generate;
+
+import com.zfoo.protocol.anno.Note;
+import com.zfoo.protocol.exception.RunException;
+import com.zfoo.protocol.model.Pair;
+import com.zfoo.protocol.registration.ProtocolRegistration;
+import com.zfoo.protocol.serializer.CodeLanguage;
+import com.zfoo.protocol.util.AssertionUtils;
+import com.zfoo.protocol.util.FileUtils;
+import com.zfoo.protocol.util.StringUtils;
+
+import java.util.*;
+
+/**
+ * EN: When generating the protocol, the document comments and field comments of the protocol will use this class
+ * During protocol generation, this class handles documentation and field comments
+ *
+ * @author godotg
+ */
+public abstract class GenerateProtocolNote {
+
+    // Temporary variable destroyed after startup; outer map key=protocol class; pair key=class comment, pair value=field comment map (key=field name)
+    // For example, the pair generated for ComplexObject in the test is in the following format:
+    /**
+     * key is docTitle note:
+     * // Complex object
+     * // Includes various complex structures: arrays, List, Set, Map
+     * //
+     * // @author godotg
+     * // @version 1.0
+     * <p>
+     * value is field note:
+     * // Byte wrapper type
+     * // Prefer primitives; wrapper types incur boxing/unboxing overhead
+     */
+    private static Map<Short, Pair<String, Map<String, String>>> protocolNoteMap = new HashMap<>();
+
+
+    public static void clear() {
+        protocolNoteMap.clear();
+        protocolNoteMap = null;
+    }
+
+    public static String protocol_note(short protocolId, CodeLanguage codeLanguage) {
+        var protocolNote = protocolNoteMap.get(protocolId);
+        var classNote = protocolNote.getKey();
+        if (StringUtils.isBlank(classNote)) {
+            return StringUtils.EMPTY;
+        }
+        return formatNote(codeLanguage, classNote);
+    }
+
+    public static List<String> fieldNotes(short protocolId, String fieldName, CodeLanguage language) {
+        var protocolNote = protocolNoteMap.get(protocolId);
+        var fieldNoteMap = protocolNote.getValue();
+        var fieldNote = fieldNoteMap.get(fieldName);
+        if (StringUtils.isBlank(fieldNote)) {
+            return Collections.emptyList();
+        }
+        var multipleLineNotes = fieldNote.split(FileUtils.LS_REGEX);
+        var notes = new ArrayList<String>();
+        for(var oneLineNote : multipleLineNotes) {
+            var formatFieldNote = formatNote(language, oneLineNote);
+            notes.add(formatFieldNote);
+        }
+        return notes;
+    }
+
+    private static String formatNote(CodeLanguage language, String note) {
+        switch (language) {
+            case Cpp:
+            case Rust:
+            case Java:
+            case Kotlin:
+            case Scala:
+            case Golang:
+            case JavaScript:
+            case EcmaScript:
+            case TypeScript:
+            case CSharp:
+            case Php:
+            case Dart:
+            case Swift:
+            case Protobuf:
+                note = StringUtils.format("// {}", note);
+                break;
+            case Lua:
+                note = StringUtils.format("-- {}", note);
+                break;
+            case Python:
+            case GdScript:
+            case Ruby:
+                note = StringUtils.format("# {}", note);
+                break;
+            case Enhance:
+            default:
+                throw new RunException("unrecognized enum type [{}]", language);
+        }
+        return note;
+    }
+
+    public static void initProtocolNote(List<ProtocolRegistration> protocolRegistrations) {
+        AssertionUtils.notNull(protocolNoteMap, "[{}] duplicate initialization", GenerateProtocolNote.class.getSimpleName());
+
+        for (var registration : protocolRegistrations) {
+            var protocolClazz = registration.protocolConstructor().getDeclaringClass();
+            var classNote = StringUtils.EMPTY;
+            var protocolClass = protocolClazz.getDeclaredAnnotation(Note.class);
+            if (protocolClass != null && StringUtils.isNotEmpty(protocolClass.value())) {
+                classNote = StringUtils.trim(protocolClass.value());
+            }
+
+            var fieldNoteMap = new HashMap<String, String>();
+            for (var field : registration.getFields()) {
+                var noteDescription = field.getDeclaredAnnotation(Note.class);
+                if (noteDescription == null || StringUtils.isEmpty(noteDescription.value())) {
+                    continue;
+                }
+                var fieldName = field.getName();
+                var fieldNote = noteDescription.value();
+                fieldNoteMap.put(fieldName, StringUtils.trim(fieldNote));
+            }
+
+            protocolNoteMap.put(registration.protocolId(), new Pair<>(classNote, fieldNoteMap));
+        }
+    }
+
+}

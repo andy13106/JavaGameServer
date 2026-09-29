@@ -1,0 +1,153 @@
+/*
+ * Copyright (C) 2020 The zfoo Authors
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and limitations under the License.
+ */
+
+package com.zfoo.protocol;
+
+import com.zfoo.protocol.buffer.ByteBufUtils;
+import com.zfoo.protocol.collection.HashMapIntShort;
+import com.zfoo.protocol.exception.DecodeException;
+import com.zfoo.protocol.generate.GenerateOperation;
+import com.zfoo.protocol.registration.IProtocolRegistration;
+import com.zfoo.protocol.registration.ProtocolAnalysis;
+import com.zfoo.protocol.registration.ProtocolModule;
+import com.zfoo.protocol.util.AssertionUtils;
+import com.zfoo.protocol.xml.XmlProtocols;
+import io.netty.buffer.ByteBuf;
+
+import java.util.*;
+
+/**
+ * @author godotg
+ */
+public class ProtocolManager {
+
+    public static final short MAX_PROTOCOL_NUM = Short.MAX_VALUE;
+    public static final byte MAX_MODULE_NUM = Byte.MAX_VALUE;
+
+    /**
+     * The protocol corresponding to the protocolId. Array index equals the protocolId.
+     */
+    public static final IProtocolRegistration[] protocols = new IProtocolRegistration[MAX_PROTOCOL_NUM];
+    /**
+     * The modules of the protocol.
+     */
+    public static final ProtocolModule[] modules = new ProtocolModule[MAX_MODULE_NUM];
+
+    /**
+     * key: packet class, value: protocolId.
+     * If all protocol Class hashCodes are unique (which is highly likely), use the high-performance HashMapIntShort.
+     */
+    public static Map<Class<?>, Short> protocolIdMap = new HashMap<>();
+    public static HashMapIntShort protocolIdPrimitiveMap = new HashMapIntShort();
+
+    static {
+        // default protocol module
+        modules[0] = ProtocolModule.DEFAULT_PROTOCOL_MODULE;
+    }
+
+    /**
+     * serialize the packet into the buffer
+     */
+    public static void write(ByteBuf buffer, Object packet) {
+        var protocolId = protocolId(packet.getClass());
+        // write the protocolId
+        ByteBufUtils.writeShort(buffer, protocolId);
+        // write the package
+        protocols[protocolId].write(buffer, packet);
+    }
+
+    /**
+     * deserialization a packet from the buffer
+     * <p>
+     * byte[] convert to ByteBuf using Unpooled.wrappedBuffer(byte[]) in netty
+     * ByteBuf convert to byte[] using ByteBufUtils.readAllBytes(ByteBuf) in zfoo
+     */
+    public static Object read(ByteBuf buffer) {
+        short protocolId = -1;
+        try {
+            protocolId = ByteBufUtils.readShort(buffer);
+            return protocols[protocolId].read(buffer);
+        } catch (Throwable e) {
+            throw new DecodeException(e, protocolId);
+        }
+    }
+
+    public static IProtocolRegistration getProtocol(short protocolId) {
+        return protocols[protocolId];
+    }
+
+    public static IProtocolRegistration getProtocol(Class<?> protocolClass) {
+        return getProtocol(protocolId(protocolClass));
+    }
+
+    public static ProtocolModule moduleByProtocolId(short id) {
+        return modules[protocols[id].module()];
+    }
+
+    public static ProtocolModule moduleByProtocol(Class<?> clazz) {
+        return moduleByProtocolId(protocolId(clazz));
+    }
+
+    /**
+     * Find the module based on the module ID
+     */
+    public static ProtocolModule moduleByModuleId(byte moduleId) {
+        var module = modules[moduleId];
+        AssertionUtils.notNull(module, "[moduleId:{}] does not exist", moduleId);
+        return module;
+    }
+
+    /**
+     * Find modules by module name
+     */
+    public static ProtocolModule moduleByModuleName(String name) {
+        var moduleOptional = Arrays.stream(modules)
+                .filter(Objects::nonNull)
+                .filter(it -> it.getName().equals(name))
+                .findFirst();
+        return moduleOptional.orElse(null);
+    }
+
+    public static short protocolId(Class<?> clazz) {
+        return protocolIdMap == null ? protocolIdPrimitiveMap.getPrimitive(clazz.hashCode()) : protocolIdMap.get(clazz);
+    }
+
+    public static boolean isProtocolClass(Class<?> clazz) {
+        return protocolIdMap == null ? protocolIdPrimitiveMap.containsKey(clazz.hashCode()) : protocolIdMap.containsKey(clazz);
+    }
+
+    public static void initProtocol(Set<Class<?>> protocolClassSet) {
+        ProtocolAnalysis.analyze(protocolClassSet, GenerateOperation.NO_OPERATION);
+    }
+
+    /**
+     * Register protocol
+     *
+     * @param protocolClassSet  A list of protocols that need to be initialized
+     * @param generateOperation Protocol configuration (which languages to generate and whether to fold, etc.)
+     */
+    public static void initProtocol(Set<Class<?>> protocolClassSet, GenerateOperation generateOperation) {
+        ProtocolAnalysis.analyze(protocolClassSet, generateOperation);
+    }
+
+    public static void initProtocol(XmlProtocols xmlProtocols, GenerateOperation generateOperation) {
+        ProtocolAnalysis.analyze(xmlProtocols, generateOperation);
+    }
+
+    /**
+     * Register protocol and automatically generate a protocol ID for sub-protocols that do not specify one.
+     */
+    public static void initProtocolAuto(List<Class<?>> protocolClassList, GenerateOperation generateOperation) {
+        ProtocolAnalysis.analyzeAuto(protocolClassList, generateOperation);
+    }
+
+}
